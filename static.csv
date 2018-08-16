@@ -1,0 +1,11 @@
+Name, eps_xx, eps_yy, eps_zz, source
+AlN, 9.14, 9.14, 9.14, "Phys Rev. 158, 3 (1967), 833-838."
+BN, 7.1, 7.1, 7.1, "Phys. Rev. 155 (1967) 1039."
+GaN, 9.7, 9.7, 9.7, "Properties of Advanced SemiconductorMaterials GaN, AlN, InN, BN, SiC, SiGe"
+InN, 15.3, 15.3, 15.3, "Properties of Advanced SemiconductorMaterials GaN, AlN, InN, BN, SiC, SiGe"
+GaAs, , , ,
+GaP, , , ,
+GaSb, , , ,
+InSb, , , ,
+InAs, 15.15, 15.15, 15.15, "?"
+
