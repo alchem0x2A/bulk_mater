@@ -96,7 +96,7 @@
     "Ge": 5.646,
     "Si": 5.431
   },
-  "NaCl": {
+  "rocksalt": {
     "ZnO": 4.58,
     "CdO": 4.7,
     "PbS": 5.936,
@@ -128,23 +128,21 @@
     "TiN": 4.26,
     "ZrS": 5.152
   },
-  "CsCl": {
+  "cesiumchloride": {
     "TlCl": 3.838,
     "TlBr": 3.985,
     "TlI": 4.184
   },
-  "other": [
-    "HgO",
-    "CuO",
-    "Cu2O",
-    "SiS2",
-    "GeS2",
-    "Ag2S",
-    "Ti2O",
-    "SnO2",
-    "ZrO2",
-    "HfO2",
-    "Cu2ZnSnS4",
-    "Si3N4"
-  ]
+  "other": {
+    "HgO": "HgO-HgO.cif",
+    "CuO": "CuO-CuO.cif",
+    "Cu2O": "Cu2O-Cu2O.cif",
+    "GeS2": "GeS2-SiS2.cif",
+    "Ag2S": "Ag2S-Ag2S.cif",
+    "TiO2": "TiO2-rutile.cif",
+    "ZrO2": "ZrO2-ZrO2.cif",
+    "HfO2": "HfO2-HfO2.cif",
+    "Si3N4":  "Si3N4-hex.cif",
+    "Al2O3": "Al2O3-corundum.cif"
+  }
 }
