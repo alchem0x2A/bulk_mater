@@ -10,7 +10,7 @@ import os, os.path
 json_file = os.path.abspath("../structure/prototype.json")
 data = json.load(open(json_file, "r"))
 
-def conver_name(cs):
+def convert_name(cs):
     cs = cs.lower()
     if cs[0] == "z":
         return "zincblende"
@@ -29,7 +29,7 @@ def get_structure(formula, cs=None):
     if cs is None:
         cs = "other"
     else:
-        cs = conver_name(cs)
+        cs = convert_name(cs)
     
     item = data[cs][formula]
     if isinstance(item, dict):  # wurtzite

@@ -109,7 +109,7 @@ def relax(atoms, name="",
     opt = QuasiNewton(atoms,
                       trajectory=traj_filename,
                       logfile=log_filename)
-    mask = [1, 1, 1, 0, 0, 0]   # only relax for xy direction
+    mask = [1, 1, 1, 0, 0, 0]   # Relax for bulk
     opt.run(fmax=0.01, smax=smax, smask=mask)
     
     # Calculate the ground state 
