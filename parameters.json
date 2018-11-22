@@ -3,7 +3,7 @@
     "xc": "PBE",
     "kpts": {
       "gamma": true,
-      "density": 6.0
+      "density": 5.0
     },
     "basis": "dzp",
     "mode": {
@@ -32,7 +32,19 @@
 	    "name": "fermi-dirac"
 	}
     },
-
+    "gap":{
+      "xc": "gllbsc",
+      "kpts": {
+	    "gamma": true,
+	    "density": 10
+      },
+      "h": 0.16,
+      "basis": "dzp",
+      "occupations": {
+	"width": 0.001,
+	"name": "fermi-dirac"
+      }
+    },
     "es": {
 	"fixdensity": true,
 	"nbands": 60,
