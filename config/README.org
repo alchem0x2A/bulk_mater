@@ -1,0 +1,6 @@
+* Folder for configuration files
+ Contains:
++ =prototype.json= bulk semiconductor types and starting guess for parameters
++ =parameters.json= parameters for calculations
++ =./crystal_structures= crystal structure files =.cif= for semiconductors that are not standard
+
