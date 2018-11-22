@@ -30,6 +30,7 @@ def run_single(formula, kind=None,
         
     world.barrier()
     if clean:
+        #TODO
         return                  # on all ranks
 
     # On all ranks
@@ -55,15 +56,16 @@ def run_single(formula, kind=None,
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         raise ValueError("Please provide 2 parameters")
-    elif len(sys.argv) == 2:
-        formula = sys.argv[1]
-        main(formula)
     elif len(sys.argv) == 3:
         formula = sys.argv[1]
         if sys.argv[2] == "clean":
-            main(formula, clean=True)
+            run_single(formula, clean=True)
         else:
             kind = sys.argv[2]
-            main(formula, kind)
+            if kind.lower() in ("none",
+                                "other",
+                                "unknown"):
+                kind = None
+            run_single(formula, kind)
     else:
         raise ValueError("Parameter ill defined!")

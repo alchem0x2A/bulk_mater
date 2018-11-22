@@ -7,7 +7,9 @@ from ase.parallel import parprint, world, broadcast, rank
 import json
 import os, os.path
 
-json_file = os.path.abspath("../structure/prototype.json")
+cur_dir = os.path.dirname(__file__)
+json_file = os.path.abspath(os.path.join(cur_dir,
+                                         "../structure/prototype.json"))
 data = json.load(open(json_file, "r"))
 
 def convert_name(cs):
