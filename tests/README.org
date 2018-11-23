@@ -1,4 +1,18 @@
 * Tests for the =bulk= module
- Contains:
- TBD
+Contains:
+TBD
+
+The tests are tested using two approaches:
+#+BEGIN_SRC python
+  # Simple Python
+  # Run at the root directory
+  python -m unittest tests.XXX.YYY
+#+END_SRC
+
+#+BEGIN_SRC python
+  # Simple Python
+  # Run at the root directory
+  gpaw-python -m unittest tests.XXX.YYY
+#+END_SRC
+
 
