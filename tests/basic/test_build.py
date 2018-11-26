@@ -31,5 +31,30 @@ class TestPath(unittest.TestCase):
         else:
             parprint("All structure passed!")
         self.assertEqual(len(failed), 0)
+    def test_build_by_name(self):
+        sb = StructureBuilder()
+        test_samples = [("AlAs", "Z"),
+                        ("ZnO", "z"),
+                        ("ZnO", "W"),
+                        ("ZnO", "R"),
+                        ("TlCl", "C"),
+                        ("HgO", None),
+                        ("Si3N4", "other"),
+                        ("Si3N4", "unknown"),
+                        ("C", "D")]
+        failed = []
+        for s in test_samples:
+            formula, prototype = s
+            try:
+                mat = sb.get_structure(formula, prototype)
+                if len(mat) == 0:
+                    failed.append((formula, prototype, "zero-len"))
+            except Exception as e:
+                failed.append((formula, prototype, e))
+        if len(failed) > 0:
+            parprint(len(failed), failed)
+        else:
+            parprint("All structure passed!")
+        self.assertEqual(len(failed), 0)
 if __name__ == "__main__":
     unittest.main()

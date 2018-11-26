@@ -36,18 +36,23 @@ class StructureBuilder(object):
                                     parameters=param))
 
         self.__entries = entries
+        self.__count = len(self.entries)
         self.__strucutre_lookup_path = structure_path
         return
 
     @property
     def entries(self):
         return self.__entries
+
+    @property
+    def count(self):
+        return self.__count
     
     def get_structure(self, formula, prototype=None):
         """Return candidates of structure provided the information
         """
         candidates = [entry for entry in self.__entries \
-                      if __entries["formula"] == formula]
+                      if entry["formula"] == formula]
         if len(candidates) == 0:
             return candidates   # always empty!
         else:
@@ -59,7 +64,16 @@ class StructureBuilder(object):
             prototypes = convert_name(prototype)
             final_candidates = [c for c in candidates \
                                 if c["prototype"] in prototypes]
-            return list(map(self.convert_struct, final_candidates))
+            return list(map(self._convert_struct, final_candidates))
+
+    def from_index(self, index):
+        if hasattr(index, "__iter__"):  # iterable?
+            candidates = [self.__entries[i] for i in index]
+        elif isinstance(index, int): # Single index
+            candidates = [self.__entries[index]]
+        else:
+            raise TypeError("Index must be a list or single int!")
+        return list(map(self._convert_struct, candidates))
 
     def _convert_struct(self, param_entry):
         formula = param_entry["formula"]
@@ -97,21 +111,23 @@ def convert_name(cs):
             _cs = cs.lower()
             if _cs[0] == "z":
                 return "zincblende"
-            elif cs[0] == "w":
+            elif _cs[0] == "w":
                 return "wurtzite"
-            elif cs[0] in ("n", "r"):
+            elif _cs[0] in ("n", "r"):
                 return "rocksalt"
-            elif cs[0] == "c":
+            elif _cs[0] == "c":
                 return "cesiumchloride"
+            elif _cs[0] == "d":
+                return "diamond"
             else:
                 return "other"
         else:
             return ""
 
-    if isinstance(_cs, str):
-        return (_cs)
-    elif isinstance(_cs, list):
-        return tuple([convert_single(c) for c in _cs])
+    if isinstance(cs, str):
+        return ([convert_single(cs)])
+    elif isinstance(cs, list):
+        return tuple([convert_single(c) for c in cs])
         
 # Construct the bulk material using given crystalline geometry
 
