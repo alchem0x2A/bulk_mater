@@ -1,5 +1,5 @@
 import ase.db
-from ase.atoms import Atoms, string2symbols
+from ase.atoms import Atoms
 from ase.io import read
 from ase.data import atomic_numbers, covalent_radii
 from ase.build import bulk
