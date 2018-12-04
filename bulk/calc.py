@@ -6,6 +6,7 @@ from ase.constraints import StrainFilter
 from ase.parallel import world, rank, parprint
 from ase.optimize import BFGS
 from ase.atoms import Atoms
+from ase.io import write, read
 
 from gpaw import GPAW, PW, FermiDirac
 
@@ -59,6 +60,7 @@ class MaterCalc(object):
         # Continue without calculation
         if os.path.exists(res_file):
             parprint("Relaxation Already Done!")
+            self.relaxed = True
             return True
         
         calc = GPAW(**self.params["relax"],
@@ -99,13 +101,45 @@ class MaterCalc(object):
             self.atoms = atoms_copy  # copy back
             atoms_copy.write(res_file)  # parallel?
             parprint("Relaxation Done!")
+            self.relaxed = True
             return True
         else:
             parprint("Something wrong with relaxation!")
+            self.relaxed = False
             return False
 
     def ground_state(self):
-        pass
+        """Calculate ground state and generate excited wavefunction
+        """
+        if not hasattr(self, "relaxed"):
+            parprint("You need to relax first!")
+            return False
+        elif self.relaxed is False:
+            parprint("You need to relax first!")
+            return False
+        self.gs_file = os.path.join(self.base_dir,
+                                    "gs.gpw")
+        if os.path.exists(self.gs_file):
+            self.gs_done = True
+            return True
+        # relaxed.traj must present
+        traj = read(os.path.join(self.base_dir,
+                                 "relaxed.traj"))
+        calc = GPAW(**self.params["gs"],
+                    txt=os.path.join(self.base_dir,
+                                     "gs.txt"))
+        traj.set_calculator(calc)
+        try:
+            traj.get_potential_energy()
+            calc.write(self.gs_file)  # write
+        except Exception as e:
+            self.gs_done = False
+            parprint("Something wrong with gs calculation!")
+            parprint("ErrMsg: {}".format(e))
+        else:
+            self.gs_done = True
+            return True
+            
 
     def bandgap(self):
         pass 
