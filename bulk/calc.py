@@ -121,6 +121,7 @@ class MaterCalc(object):
                                     "gs.gpw")
         if os.path.exists(self.gs_file):
             self.gs_done = True
+            parprint("Ground state already done!")
             return True
         # relaxed.traj must present
         traj = read(os.path.join(self.base_dir,
