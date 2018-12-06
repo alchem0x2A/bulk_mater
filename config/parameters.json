@@ -11,68 +11,50 @@
       "name": "pw"
     },
     "occupations": {
-      "width": 0.001,
+      "width": 0.01,
       "name": "fermi-dirac"
     }
   },
-
-    "gs": {
-	"xc": "PBE",
-	"kpts": {
-	    "gamma": true,
-	    "density": 10
-	},
-	"basis": "dzp",
-	"mode": {
-	    "ecut": 800,
-	    "name": "pw"
-	},
-	"occupations": {
-	    "width": 0.001,
-	    "name": "fermi-dirac"
-	}
+  "gs": {
+    "xc": "PBE",
+    "kpts": {
+      "gamma": true,
+      "density": 10
     },
-    "gap":{
-      "xc": "GLLBSC",
-      "kpts": {
-	    "gamma": true,
-	    "density": 10
-      },
-      "h": 0.16,
-      "basis": "dzp",
-      "occupations": {
-	"width": 0.001,
-	"name": "fermi-dirac"
-      }
+    "basis": "dzp",
+    "mode": {
+      "ecut": 800,
+      "name": "pw"
     },
-    "es": {
-	"fixdensity": true,
-	"nbands": 60,
-	"kpts": {
-	    "gamma": false,
-	    "density": 10
-	},
-	"convergence": {
-	    "bands": -5
-	},
-	"occupations": {
-	    "width": 0.001,
-	    "name": "fermi-dirac"
-	}
-    },
-
-    "df": {
-	"eta": 0.05,
-        "domega0": 0.005,
-        "intraband": false,
-	"ecut": 50
-    },
-
-    "tetra": {
-	"eta": 0.05,
-	"domega0": 0.005,
-        "integrationmode": "tetrahedron integration",
-        "intraband": false,
-	"ecut": 50
+    "occupations": {
+      "width": 0.01,
+      "name": "fermi-dirac"
     }
+  },
+  "gap": {
+    "GLLB": {
+      "xc": "GLLBSC",
+      "npoints": 256
+    },
+    "PBE": {
+      "xc": "PBE",
+      "npoints": 256
+    }
+  },
+  "es": {
+    "fixdensity": true,
+    "kpts": {
+      "gamma": false,
+      "density": 10
+    },
+    "convergence": {
+      "bands": -5
+    }
+  },
+  "rpa": {
+    "eta": 0.05,
+    "domega0": 0.005,
+    "intraband": false,
+    "ecut": 50
+  }
 }

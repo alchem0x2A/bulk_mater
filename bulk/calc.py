@@ -7,6 +7,9 @@ from ase.parallel import world, rank, parprint
 from ase.optimize import BFGS
 from ase.atoms import Atoms
 from ase.io import write, read
+from ase.dft.bandgap import bandgap as bg
+from ase.dft.kpoints import special_paths, get_cellinfo
+from ase.units import Ha
 
 from gpaw import GPAW, PW, FermiDirac
 
@@ -40,6 +43,8 @@ class MaterCalc(object):
                                            "relaxed.traj")
         self.__gs_file = os.path.join(self.__base_dir,
                                      "gs.gpw")  # ground state in PBE
+        self.__gs_gllb_file = os.path.join(self.__base_dir,
+                                           "gs_gllb.gpw")  # ground state in PBE
         self.__es_file = os.path.join(self.__base_dir,
                                       "es.gpw")  # excited states in PBE
 
@@ -139,8 +144,90 @@ class MaterCalc(object):
             return True
             
 
-    def bandgap(self):
-        pass 
+    def bandgap(self, method="GLLB"):
+        if not os.path.exists(self.__gs_file):
+            parprint("Ground state not calculated!")
+            return False
+        method = method.strip().upper()
+        if method not in ("PBE", "GLLB",
+                          "HSE", "GW"):
+            raise ValueError("Method for bandgap calculation not known!")
+        lattice_type = get_cellinfo(self.atoms.cell).lattice
+        use_bs = lattice_type in special_paths.keys()
+        if method == "PBE":
+            # Use band_structure or simple sampling kpts?
+            if use_bs:
+                kpts = dict(path=special_paths[lattice_type],
+                            npoints=self.params["gap"][method]["npoints"])
+            else:
+                kpts = dict(density=12)  # denser
+            calc = GPAW(restart=self.__gs_file)
+            calc.set(kpts=kpts,
+                     fixdensity=True,
+                     symmetry="off")  # non-SC
+            calc.get_potential_energy()  # Otherwise the wavefunction not known?
+            bg_min, *_ = bg(calc, direct=False)
+            bg_dir, *_ = bg(calc, direct=True)
+            if use_bs:
+                bs = calc.band_structure()
+                xcoords, label_xcoords, labels = bs.get_labels()
+                res_bs = bs.todict()
+                res_bs.update(xcoords=xcoords,
+                              label_xcoords=label_xcoords,
+                              labels=labels)
+            else:
+                res_bs = None
+            return bg_min, bg_dir, res_bs
+        elif method == "GLLB":
+            # Need to restart the SC calculation
+            if not os.path.exists(self.__gs_gllb_file):
+                calc_ = GPAW(restart=self.__gs_file, txt=None)
+                calc = GPAW(**self.params["gs"])
+                calc.atoms = calc_.atoms.copy()
+                calc.set(xc="GLLBSC")
+                del calc_
+                calc.get_potential_energy()  # Recalculate GS
+                calc.write(self.__gs_gllb_file)
+            #TODO: merge with PBE method
+            if use_bs:
+                kpts = dict(path=special_paths[lattice_type],
+                            npoints=self.params["gap"][method]["npoints"])
+            else:
+                kpts = dict(density=12)
+            calc_bs = GPAW(restart=self.__gs_gllb_file)
+            calc_bs.set(kpts=kpts,
+                        fixdensity=True,
+                        symmetry="off")
+            calc_bs.get_potential_energy()
+            homolumo = calc_bs.get_homo_lumo()
+            response = calc_bs.hamiltonian.xc.xcs["RESPONSE"]
+            response.calculate_delta_xc( homolumo / Ha)
+            EKs, Dxc = response.calculate_delta_xc_perturbation()
+            ns = calc_bs.get_number_of_spins()
+            nk = len(calc_bs.get_ibz_k_points())
+            e_kn = numpy.array([[calc_bs.get_eigenvalues(kpt=k, spin=s) \
+                                for k in range(nk)] for s in range(ns)])
+            efermi = calc_bs.get_fermi_level()
+            e_kn[e_kn > efermi] += Dxc
+            bg_gllb_min, *_ = bg(eigenvalues=e_kn,
+                                      efermi=efermi,
+                                      direct=False)
+            bg_gllb_dir, *_  = bg(eigenvalues=e_kn,
+                                       efermi=efermi,
+                                       direct=True)
+            if use_bs:
+                bs = calc_bs.band_structure()
+                bs.energies[bs.energies > bs.reference] += Dxc  # Shift gllbsc discontinuous
+                res_bs = bs.todict()
+                xcoords, label_xcoords, labels = bs.get_labels()
+                res_bs.update(xcoords=xcoords,
+                              label_xcoords=label_xcoords,
+                              labels=labels)
+            else:
+                res_bs = None
+            return bg_gllb_min, bg_gllb_dir, res_bs
+        else:
+            raise NotImplementedError("Method not implemented yet")
 
     def excited_state(self):
         pass
