@@ -65,7 +65,7 @@ class Test(unittest.TestCase):
         calc_gllb_bs.get_potential_energy()
         homolumo = calc_gllb_bs.get_homo_lumo()
         bg_gllb_ks = homolumo[1] - homolumo[0]
-        response = calc_gllb.hamiltonian.xc.xcs["RESPONSE"]
+        response = calc_gllb_bs.hamiltonian.xc.xcs["RESPONSE"]
         response.calculate_delta_xc( homolumo / Ha)
         EKs, Dxc = response.calculate_delta_xc_perturbation()
         bg_gllb_deltaxc = EKs + Dxc
