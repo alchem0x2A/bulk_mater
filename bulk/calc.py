@@ -34,7 +34,14 @@ class MaterCalc(object):
             if rank == 0:
                 os.makedirs(base_dir)   # Recursively makedirs
         world.barrier()
+        # Handle file path-related issues
         self.__base_dir = os.path.abspath(base_dir)
+        self.__relaxed_traj = os.path.join(self.__base_dir,
+                                           "relaxed.traj")
+        self.__gs_file = os.path.join(self.__base_dir,
+                                     "gs.gpw")  # ground state in PBE
+        self.__es_file = os.path.join(self.__base_dir,
+                                      "es.gpw")  # excited states in PBE
 
         if isinstance(atoms, Atoms):
             self.atoms = atoms
@@ -56,11 +63,9 @@ class MaterCalc(object):
               steps=500):        # maximum steps
         atoms_copy = self.atoms.copy()  # makesure nothing happens
         method = method.upper()
-        res_file = os.path.join(self.base_dir, "relaxed.traj")  # relaxed trajectory
         # Continue without calculation
-        if os.path.exists(res_file):
+        if os.path.exists(self.__relaxed_traj):
             parprint("Relaxation Already Done!")
-            self.relaxed = True
             return True
         
         calc = GPAW(**self.params["relax"],
@@ -99,44 +104,36 @@ class MaterCalc(object):
                 
         if converged:
             self.atoms = atoms_copy  # copy back
-            atoms_copy.write(res_file)  # parallel?
+            atoms_copy.write(self.__relaxed_traj)  # parallel?
             parprint("Relaxation Done!")
-            self.relaxed = True
             return True
         else:
             parprint("Something wrong with relaxation!")
-            self.relaxed = False
             return False
 
     def ground_state(self):
         """Calculate ground state and generate excited wavefunction
         """
-        if not hasattr(self, "relaxed"):
-            parprint("You need to relax first!")
+        if not os.path.exists(self.__relaxed_traj):
+            parprint("Need to relax first!")
             return False
-        elif self.relaxed is False:
-            parprint("You need to relax first!")
-            return False
-        self.gs_file = os.path.join(self.base_dir,
-                                    "gs.gpw")
-        if os.path.exists(self.gs_file):
-            self.gs_done = True
+        
+        if os.path.exists(self.__gs_file):
             parprint("Ground state already done!")
             return True
         # relaxed.traj must present
-        traj = read(os.path.join(self.base_dir,
-                                 "relaxed.traj"))
+        traj = read(self.__relaxed_traj)
         calc = GPAW(**self.params["gs"],
                     txt=os.path.join(self.base_dir,
                                      "gs.txt"))
         traj.set_calculator(calc)
         try:
             traj.get_potential_energy()
-            calc.write(self.gs_file)  # write
+            calc.write(self.__gs_file)  # write
         except Exception as e:
-            self.gs_done = False
             parprint("Something wrong with gs calculation!")
             parprint("ErrMsg: {}".format(e))
+            return False
         else:
             self.gs_done = True
             return True
