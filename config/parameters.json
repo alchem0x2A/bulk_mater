@@ -11,7 +11,7 @@
       "name": "pw"
     },
     "occupations": {
-      "width": 0.01,
+      "width": 0.001,
       "name": "fermi-dirac"
     }
   },
@@ -27,18 +27,18 @@
       "name": "pw"
     },
     "occupations": {
-      "width": 0.01,
+      "width": 0.001,
       "name": "fermi-dirac"
     }
   },
   "gap": {
-    "GLLB": {
+    "gllb": {
       "xc": "GLLBSC",
-      "npoints": 256
+      "npoints": 120
     },
-    "PBE": {
+    "pbe": {
       "xc": "PBE",
-      "npoints": 256
+      "npoints": 120
     }
   },
   "es": {
@@ -49,12 +49,16 @@
     },
     "convergence": {
       "bands": -5
+    },
+    "parallel": {
+      "kpt": 1
     }
   },
   "rpa": {
     "eta": 0.05,
     "domega0": 0.005,
     "intraband": false,
-    "ecut": 50
+    "ecut": 50,
+    "omegamax": 60
   }
 }

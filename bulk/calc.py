@@ -12,6 +12,7 @@ from ase.dft.kpoints import special_paths, get_cellinfo
 from ase.units import Ha
 
 from gpaw import GPAW, PW, FermiDirac
+from gpaw.response.df import DielectricFunction
 
 cur_dir = os.path.dirname(__file__)
 default_json_file = os.path.abspath(os.path.join(cur_dir,
@@ -45,8 +46,12 @@ class MaterCalc(object):
                                      "gs.gpw")  # ground state in PBE
         self.__gs_gllb_file = os.path.join(self.__base_dir,
                                            "gs_gllb.gpw")  # ground state in PBE
+        self.__bg_file_template = os.path.join(self.__base_dir,
+                                               "bg_{}.gpw")  # to add later
         self.__es_file = os.path.join(self.__base_dir,
                                       "es.gpw")  # excited states in PBE
+        self.__eps_file_template = os.path.join(self.__base_dir,
+                                                "eps_{}.npz")
 
         if isinstance(atoms, Atoms):
             self.atoms = atoms
@@ -120,8 +125,7 @@ class MaterCalc(object):
         """Calculate ground state and generate excited wavefunction
         """
         if not os.path.exists(self.__relaxed_traj):
-            parprint("Need to relax first!")
-            return False
+            raise FileNotFoundError("Need to relax first!")
         
         if os.path.exists(self.__gs_file):
             parprint("Ground state already done!")
@@ -140,21 +144,29 @@ class MaterCalc(object):
             parprint("ErrMsg: {}".format(e))
             return False
         else:
-            self.gs_done = True
             return True
             
 
-    def bandgap(self, method="GLLB"):
-        if not os.path.exists(self.__gs_file):
-            parprint("Ground state not calculated!")
-            return False
-        method = method.strip().upper()
-        if method not in ("PBE", "GLLB",
-                          "HSE", "GW"):
+    def bandgap(self, method="GLLB", save=True):
+        # Check method input
+        method = method.strip().lower()
+        if method not in ("pbe", "gllb",
+                          "hse", "gw"):
             raise ValueError("Method for bandgap calculation not known!")
+        # Check ground state
+        if not os.path.exists(self.__gs_file):
+            raise FileNotFoundError("Ground state not calculated!")
+        
+        # Check bandgap?
+        self.__bg_file = self.__bg_file_template.format(method)
+        if os.path.exists(self.__bg_file):
+            parprint("Bandgap for method {} is already calculated!".format(method))
+            return True
+        
+        # Real calculation now
         lattice_type = get_cellinfo(self.atoms.cell).lattice
         use_bs = lattice_type in special_paths.keys()
-        if method == "PBE":
+        if method == "pbe":
             # Use band_structure or simple sampling kpts?
             if use_bs:
                 kpts = dict(path=special_paths[lattice_type],
@@ -164,7 +176,8 @@ class MaterCalc(object):
             calc = GPAW(restart=self.__gs_file)
             calc.set(kpts=kpts,
                      fixdensity=True,
-                     symmetry="off")  # non-SC
+                     symmetry="off",
+                     txt=None)  # non-SC
             calc.get_potential_energy()  # Otherwise the wavefunction not known?
             bg_min, *_ = bg(calc, direct=False)
             bg_dir, *_ = bg(calc, direct=True)
@@ -178,7 +191,7 @@ class MaterCalc(object):
             else:
                 res_bs = None
             return bg_min, bg_dir, res_bs
-        elif method == "GLLB":
+        elif method == "gllb":
             # Need to restart the SC calculation
             if not os.path.exists(self.__gs_gllb_file):
                 calc_ = GPAW(restart=self.__gs_file, txt=None)
@@ -225,15 +238,70 @@ class MaterCalc(object):
                               labels=labels)
             else:
                 res_bs = None
+            if save:
+                if rank == 0:
+                    numpy.savez(self.__bg_file,
+                                Eg_min=bg_gllb_min,
+                                Eg_dir=bg_gllb_dir,
+                                **res_bs)
+                    print("Bandgap saved!")
+            world.barrier()
             return bg_gllb_min, bg_gllb_dir, res_bs
         else:
             raise NotImplementedError("Method not implemented yet")
 
     def excited_state(self):
-        pass
+        # Only depend on the ground state
+        if not os.path.exists(self.__gs_file):
+            raise FileNotFoundError("Ground state not calculated!")
+        
+        if os.path.exists(self.__es_file):
+            parprint("Excited state calculated!")
+            return True
 
-    def dielectric(self):
-        pass
+        calc = GPAW(restart=self.__gs_file,
+                    **self.params["es"])
+        calc.get_potential_energy()
+        nv = calc.get_number_of_electrons() // 2
+        nbands = max(70, nv * 3)  # include empty bands
+        # calc.set(**self.params["es"])  # only parallel over 1 kpt
+        calc.diagonalize_full_hamiltonian(nbands=nbands)  # diagonalize
+        calc.write(self.__es_file, mode="all")
+        parprint("Excited states calculated!")
+        return True
+        
+    def dielectric(self, method="rpa"):
+        method = method.lower()
+        if method not in ("rpa", "gw"):
+            raise ValueError("Dielectric Method not known!")
+        if not os.path.exists(self.__es_file):
+            raise FileNotFoundError("Ground state not calculated!")
+        
+        self.__eps_file = self.__eps_file_template.format(method)
+        if os.path.exists(self.__eps_file):
+            parprint(("Dielectricfunction using"
+                      " method {} already calculated!").format(method))
+            return True
+        if os.path.exists(self.__es_file):
+            parprint("Excited state done, will use directly!")
+        if method == "rpa":
+            df = DielectricFunction(calc=self.__es_file,
+                                    **self.params[method])
+            epsx0, epsx = df.get_dielectric_function(direction="x")
+            epsy0, epsy = df.get_dielectric_function(direction="y")
+            epsz0, epsz = df.get_dielectric_function(direction="z")
+            freq = df.get_frequencies()
+            data = dict(frequencies=freq,
+                        eps_x=epsx, eps_x0=epsx0,
+                        eps_y=epsy, eps_y0=epsy0,
+                        eps_z=epsz, eps_z0=epsz)
+            # write result
+            if rank == 0:
+                numpy.savez(self.__eps_file, **data)
+            parprint("Dielectric function using {} calculated!".format(method))
+            return True
+        else:
+            raise NotImplementedError("{} not implemented".format(method))
 
 
 # Relax single atom
