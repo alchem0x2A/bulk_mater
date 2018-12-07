@@ -287,9 +287,12 @@ class MaterCalc(object):
         if method == "rpa":
             df = DielectricFunction(calc=self.__es_file,
                                     **self.params[method])
-            epsx0, epsx = df.get_dielectric_function(direction="x")
-            epsy0, epsy = df.get_dielectric_function(direction="y")
-            epsz0, epsz = df.get_dielectric_function(direction="z")
+            epsx0, epsx = df.get_dielectric_function(direction="x",
+                                                     filename=None)
+            epsy0, epsy = df.get_dielectric_function(direction="y",
+                                                     filename=None)
+            epsz0, epsz = df.get_dielectric_function(direction="z",
+                                                     filename=None)
             freq = df.get_frequencies()
             data = dict(frequencies=freq,
                         eps_x=epsx, eps_x0=epsx0,
