@@ -42,6 +42,8 @@ class MaterCalc(object):
         self.__base_dir = os.path.abspath(base_dir)
         self.__relaxed_traj = os.path.join(self.__base_dir,
                                            "relaxed.traj")
+        self.__relaxed_gllb_traj = os.path.join(self.__base_dir,
+                                                "relaxed_gllb.traj")
         self.__gs_file = os.path.join(self.__base_dir,
                                      "gs.gpw")  # ground state in PBE
         self.__gs_gllb_file = os.path.join(self.__base_dir,
@@ -55,6 +57,8 @@ class MaterCalc(object):
 
         if isinstance(atoms, Atoms):
             self.atoms = atoms
+        elif atoms is None:     # Dummy instance for checking only
+            self.atoms = None
         else:
             raise TypeError("Atom must be an Atoms instance!")
         return
@@ -70,21 +74,36 @@ class MaterCalc(object):
     def relax(self,
               method="IT",
               fmax=0.01,        # maximum force or stress * Volume
-              steps=500):        # maximum steps
+              steps=500,
+              xc="pbe"):        # maximum steps
         atoms_copy = self.atoms.copy()  # makesure nothing happens
         method = method.upper()
         # Continue without calculation
-        if os.path.exists(self.__relaxed_traj):
+        xc = xc.lower()
+        if xc == "pbe":
+            relaxed_traj = self.__relaxed_traj
+        elif xc == "gllb":
+            relaxed_traj = self.__relaxed_gllb_traj
+        else:
+            raise NotImplementedError("xc method not implemented")
+            
+        if os.path.exists(relaxed_traj):
             parprint("Relaxation Already Done!")
             return True
         
         calc = GPAW(**self.params["relax"],
-                    txt=os.path.join(self.base_dir, "relax.txt"))
+                    txt=os.path.join(self.base_dir, "relax_{}.txt".format(xc)))
+        if xc == "gllb":
+            calc.set(xc="PBEsol")
         atoms_copy.set_calculator(calc)
-        traj_filename = os.path.join(self.base_dir,
-                                     "relax-{}.traj".format(method))
-        log_filename = os.path.join(self.base_dir,
-                                     "relax-{}.log".format(method))
+        if xc == "pbe":
+            traj_filename = os.path.join(self.base_dir,
+                                         "relax-{}-{}.traj".format(method, xc))
+            log_filename = os.path.join(self.base_dir,
+                                        "relax-{}-{}.log".format(method, xc))
+        else:
+            traj_filename = None
+            log_filename = None
 
         # Now choose the method
         if method in ("UCF", "ECF"):  # UnitCellFilter
@@ -113,8 +132,9 @@ class MaterCalc(object):
                 loop += 1
                 
         if converged:
-            self.atoms = atoms_copy  # copy back
-            atoms_copy.write(self.__relaxed_traj)  # parallel?
+            if xc == "pbe":
+                self.atoms = atoms_copy  # copy back only for pbe
+            atoms_copy.write(relaxed_traj)  # parallel?
             parprint("Relaxation Done!")
             return True
         else:
@@ -203,11 +223,12 @@ class MaterCalc(object):
         elif method == "gllb":
             # Need to restart the SC calculation
             if not os.path.exists(self.__gs_gllb_file):
-                calc_ = GPAW(restart=self.__gs_file, txt=None)
-                calc = GPAW(**self.params["gs"])
-                calc.atoms = calc_.atoms.copy()
+                if not os.path.exists(self.__relaxed_gllb_traj):
+                    self.relax(fmax=0.002, steps=200, xc="gllb")
+                calc = GPAW(**self.params["gs"], txt=os.path.join(self.__base_dir,
+                                                                  "gs_gllb.txt"))
+                calc.atoms = read(self.__relaxed_gllb_traj)
                 calc.set(xc="GLLBSC")
-                del calc_
                 calc.get_potential_energy()  # Recalculate GS
                 calc.write(self.__gs_gllb_file)
             #TODO: merge with PBE method
