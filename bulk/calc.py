@@ -47,7 +47,7 @@ class MaterCalc(object):
         self.__gs_gllb_file = os.path.join(self.__base_dir,
                                            "gs_gllb.gpw")  # ground state in PBE
         self.__bg_file_template = os.path.join(self.__base_dir,
-                                               "bg_{}.gpw")  # to add later
+                                               "bg_{}.npz")  # to add later
         self.__es_file = os.path.join(self.__base_dir,
                                       "es.gpw")  # excited states in PBE
         self.__eps_file_template = os.path.join(self.__base_dir,
@@ -161,7 +161,8 @@ class MaterCalc(object):
         self.__bg_file = self.__bg_file_template.format(method)
         if os.path.exists(self.__bg_file):
             parprint("Bandgap for method {} is already calculated!".format(method))
-            return True
+            data = numpy.load(self.__bg_file)
+            return data["Eg_min"], data["Eg_dir"], None
         
         # Real calculation now
         lattice_type = get_cellinfo(self.atoms.cell).lattice
@@ -190,6 +191,14 @@ class MaterCalc(object):
                               labels=labels)
             else:
                 res_bs = None
+            if save:
+                if rank == 0:
+                    numpy.savez(self.__bg_file,
+                                Eg_min=bg_min,
+                                Eg_dir=bg_dir,
+                                **res_bs)
+                    print("Bandgap saved!")
+            world.barrier()
             return bg_min, bg_dir, res_bs
         elif method == "gllb":
             # Need to restart the SC calculation
@@ -305,46 +314,16 @@ class MaterCalc(object):
             return True
         else:
             raise NotImplementedError("{} not implemented".format(method))
-
-
-# Relax single atom
-def relax(atoms, name="",
-          base_dir="./",
-          smax=2e-4):
-    curr_dir = os.path.dirname(os.path.abspath(__file__))
-    param_file = os.path.join(curr_dir, "../parameters.json")
-    gpw_file = os.path.join(base_dir, "gs.gpw")
-    if os.path.exists(gpw_file):
-        parprint("Relaxation already done, will use gpw directly!")
-        return 0
-    if os.path.exists(param_file):
-        params = json.load(open(param_file, "r"))
-    else:
-        raise FileNotFoundError("no parameter file!")
     
-    # calculation asign
-    calc = GPAW(**params["relax"])
-    atoms.set_calculator(calc)
-    traj_filename = os.path.join(base_dir,
-                                 "{}_relax.traj".format(name))
-    log_filename = os.path.join(base_dir,
-                                 "{}_relax.log".format(name))
-    opt = QuasiNewton(atoms,
-                      trajectory=traj_filename,
-                      logfile=log_filename)
-    mask = [1, 1, 1, 0, 0, 0]   # Relax for bulk
-    opt.run(fmax=0.01, smax=smax, smask=mask)
-    
-    # Calculate the ground state 
-    calc.set(**params["gs"])
-    atoms.get_potential_energy()
-    calc.write(gpw_file)
-    
-    
-def optimize_method(atom,
-                    method="IT",
-                    fmax=0.005,  # max force or stess * V
-                    steps=400,):      # max steps
-    method = method.upper()
-    
-    
+    def check_status(self,
+                     bg_method="gllb",
+                     eps_method="rpa"):
+        """Check the status of calculation.
+        """
+        exists = os.path.exists
+        result = dict(relax=exists(self.__relaxed_traj),
+                      gs=exists(self.__gs_file),
+                      bandgap=exists(self.__bg_file_template.format(bg_method.lower())),
+                      es=exists(self.__es_file),
+                      dielectric=exists(self.__eps_file_template.format(eps_method.lower())))
+        return result

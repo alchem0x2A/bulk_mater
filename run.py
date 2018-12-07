@@ -1,62 +1,46 @@
 import sys
-import os, os.path
+import os
+from os.path import exists, join, dirname, abspath
 # May need this for the path issue
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from src.build import get_structure
-from src.relax import relax
-from src.bandgap import gap
-from src.dielectric import excited, permittivity
-import shutil
+from bulk.build import StructureBuilder
+from bulk.calc import MaterCalc
 from ase.parallel import paropen, parprint, world, rank, broadcast
+import shutil
 
-def run_single(formula, kind=None, 
-         root="/cluster/scratch/ttian/bulk",
-         clean=False):
-    # candidates = {}
-    # if rank == 0:
-    mol = get_structure(formula, cs=kind)
-    if mol is None:
-        return False
-    name = "{}-{}".format(formula, kind)
-
+# run single job
+def run_single(formula, prototype, 
+               root="/cluster/scratch/ttian/bulk",
+               clean=False):
+    name = "{}-{}".format(formula, prototype)
+    base_dir = join(root, name)
     # Directory manipulation
     if rank == 0:    
-        base_dir = os.path.join(root, name)
         if clean:
             shutil.rmtree(base_dir, ignore_errors=True)
                 
-        if not os.path.exists(base_dir):
+        if not exists(base_dir):
             os.makedirs(base_dir)
-        
     world.barrier()
-    if clean:
-        #TODO
-        return                  # on all ranks
+    
+    sb = StructureBuilder()
+    atoms, *_ = sb.get_structure(formula, prototype)
+    m_calc = MaterCalc(atoms=atoms, base_dir=base_dir)
+    m_calc.relax(fmax=0.002)
+    m_calc.ground_state()
+    eg_min, eg_dir, *_ = m_calc.bandgap(method="pbe")
+    parprint("PBE min/dir: {:.3f}\t{:.3f}".format(eg_min, eg_dir))
+    eg_min, eg_dir, *_ = m_calc.bandgap(method="gllb")
+    parprint("GLLB min/dir: {:.3f}\t{:.3f}".format(eg_min, eg_dir))
+    m_calc.excited_state()
+    m_calc.dielectric(method="rpa")
 
-    # On all ranks
-    base_dir = os.path.join(root, name)
-    # Relaxation and gs
-    relax(mol, name=name,
-          base_dir=base_dir)
-    parprint("Relaxation for {} finished!".format(name))
-
-    gap(base_dir=base_dir, mode="gllb")
-    parprint("Bandgap for {} calculated!".format(name))
-    
-    excited(base_dir=base_dir)
-    parprint("Excitation for {} finished!".format(name))
-    
-    permittivity(base_dir=base_dir, mode="df")
-    parprint("Permittivity for {} finished!".format(name))
-    
-        # polarizability(base_dir=base_dir, mode="tetra")  # 
-        # parprint("Polarizability using tetra {} finished!".format(name))
     return 0
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        raise ValueError("Please provide 2 parameters")
-    elif len(sys.argv) == 3:
+        raise ValueError("Please provide at least 2 parameters")
+    elif len(sys.argv) >= 3:
         formula = sys.argv[1]
         if sys.argv[2] == "clean":
             run_single(formula, clean=True)
