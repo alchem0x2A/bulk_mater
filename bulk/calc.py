@@ -296,7 +296,7 @@ class MaterCalc(object):
         nv = calc.get_number_of_electrons() // 2
         nbands = max(70, nv * 3)  # include empty bands
         # calc.set(**self.params["es"])  # only parallel over 1 kpt
-        calc.diagonalize_full_hamiltonian(nbands=nbands)  # diagonalize
+        calc.diagonalize_full_hamiltonian(nbands=int(nbands))  # diagonalize
         calc.write(self.__es_file, mode="all")
         parprint("Excited states calculated!")
         return True
