@@ -3,7 +3,7 @@ import os
 from os.path import exists, join, dirname, abspath
 # May need this for the path issue
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from bulk.build import StructureBuilder
+from bulk.build import StructureBuilder, convert_name
 from bulk.calc import MaterCalc
 from ase.parallel import paropen, parprint, world, rank, broadcast
 import shutil
@@ -12,6 +12,7 @@ import shutil
 def run_single(formula, prototype, 
                root="/cluster/scratch/ttian/bulk",
                clean=False):
+    prototype = convert_name(prototype)[0]
     name = "{}-{}".format(formula, prototype)
     base_dir = join(root, name)
     # Directory manipulation
@@ -38,18 +39,22 @@ def run_single(formula, prototype,
     return 0
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        raise ValueError("Please provide at least 2 parameters")
+    if len(sys.argv) < 2:
+        raise ValueError("Please provide at least 1 parameters")
+
+    formula = sys.argv[1]
+    if len(sys.argv) == 2:
+        proto = None
+        run_single(formula, proto)
     elif len(sys.argv) >= 3:
-        formula = sys.argv[1]
         if sys.argv[2] == "clean":
             run_single(formula, clean=True)
         else:
-            kind = sys.argv[2]
-            if kind.lower() in ("none",
+            proto = sys.argv[2]
+            if proto.lower() in ("none",
                                 "other",
                                 "unknown"):
-                kind = None
-            run_single(formula, kind)
+                proto = "other"
+            run_single(formula, proto)
     else:
         raise ValueError("Parameter ill defined!")

@@ -116,7 +116,8 @@ class MaterCalc(object):
             converged = False
             sf = StrainFilter(atoms_copy)
             loop = 0
-            while (loop < 5) and (converged is False):
+            max_loop = 10
+            while (loop < max_loop) and (converged is False):
                 opt_strain = BFGS(sf,
                                   trajectory=traj_filename,
                                   logfile=log_filename)
@@ -131,15 +132,15 @@ class MaterCalc(object):
                 converged = conv_step and conv_job
                 loop += 1
                 
-        if converged:
-            if xc == "pbe":
-                self.atoms = atoms_copy  # copy back only for pbe
-            atoms_copy.write(relaxed_traj)  # parallel?
-            parprint("Relaxation Done!")
-            return True
+        if not converged:
+            # But still use the "relaxed trajectory"
+            parprint("Relaxation result might be unstable!")
         else:
-            parprint("Something wrong with relaxation!")
-            return False
+            parprint("Relaxation Done!")
+        if xc == "pbe":
+            self.atoms = atoms_copy  # copy back only for pbe
+        atoms_copy.write(relaxed_traj)  # parallel?
+        return True
 
     def ground_state(self):
         """Calculate ground state and generate excited wavefunction
