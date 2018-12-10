@@ -186,21 +186,19 @@ class MaterCalc(object):
             return data["Eg_min"], data["Eg_dir"], None
         
         # Real calculation now
-        try:
-            lattice_type = get_cellinfo(self.atoms.cell).lattice
-            use_bs = lattice_type in special_paths.keys()
-        except ValueError:      # Monolithic cell?
-            use_bs = False
             
         if method == "pbe":
             # Use band_structure or simple sampling kpts?
+            calc = GPAW(restart=self.__gs_file)
+            try:
+                lattice_type = get_cellinfo(calc.atoms.cell).lattice
+                use_bs = lattice_type in special_paths.keys()
+            except (ValueError, AssertionError):      # Monolithic cell?
+                use_bs = False
+            parprint("Use bandpath?", use_bs)
             if use_bs:
                 kpts = dict(path=special_paths[lattice_type],
                             npoints=self.params["gap"][method]["npoints"])
-            else:
-                kpts = None
-            calc = GPAW(restart=self.__gs_file)
-            if kpts is not None:
                 calc.set(kpts=kpts,
                          fixdensity=True,
                          symmetry="off",
@@ -221,7 +219,7 @@ class MaterCalc(object):
                               label_xcoords=label_xcoords,
                               labels=labels)
             else:
-                res_bs = None
+                res_bs = {}     # no result
             if save:
                 if rank == 0:
                     numpy.savez(self.__bg_file,
@@ -243,14 +241,15 @@ class MaterCalc(object):
                 calc.get_potential_energy()  # Recalculate GS
                 calc.write(self.__gs_gllb_file)
             #TODO: merge with PBE method
+            calc_bs = GPAW(restart=self.__gs_gllb_file)
+            try:
+                lattice_type = get_cellinfo(calc_bs.atoms.cell).lattice
+                use_bs = lattice_type in special_paths.keys()
+            except (ValueError, AssertionError):      # Monolithic cell?
+                use_bs = False
             if use_bs:
                 kpts = dict(path=special_paths[lattice_type],
                             npoints=self.params["gap"][method]["npoints"])
-            else:
-                kpts = None
-
-            calc_bs = GPAW(restart=self.__gs_gllb_file)
-            if kpts is not None:
                 calc_bs.set(kpts=kpts,
                             fixdensity=True,
                             symmetry="off")
@@ -284,7 +283,7 @@ class MaterCalc(object):
                               label_xcoords=label_xcoords,
                               labels=labels)
             else:
-                res_bs = None
+                res_bs = {}
             if save:
                 if rank == 0:
                     numpy.savez(self.__bg_file,
