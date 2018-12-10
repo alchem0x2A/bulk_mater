@@ -186,23 +186,33 @@ class MaterCalc(object):
             return data["Eg_min"], data["Eg_dir"], None
         
         # Real calculation now
-        lattice_type = get_cellinfo(self.atoms.cell).lattice
-        use_bs = lattice_type in special_paths.keys()
+        try:
+            lattice_type = get_cellinfo(self.atoms.cell).lattice
+            use_bs = lattice_type in special_paths.keys()
+        except ValueError:      # Monolithic cell?
+            use_bs = False
+            
         if method == "pbe":
             # Use band_structure or simple sampling kpts?
             if use_bs:
                 kpts = dict(path=special_paths[lattice_type],
                             npoints=self.params["gap"][method]["npoints"])
             else:
-                kpts = dict(density=12)  # denser
+                kpts = None
             calc = GPAW(restart=self.__gs_file)
-            calc.set(kpts=kpts,
-                     fixdensity=True,
-                     symmetry="off",
-                     txt=None)  # non-SC
+            if kpts is not None:
+                calc.set(kpts=kpts,
+                         fixdensity=True,
+                         symmetry="off",
+                         txt=None)  # non-SC
             calc.get_potential_energy()  # Otherwise the wavefunction not known?
             bg_min, *_ = bg(calc, direct=False)
             bg_dir, *_ = bg(calc, direct=True)
+            # Possibly no gap
+            if bg_min is None:
+                bg_min = 0
+            if bg_dir is None:
+                bg_dir = 0
             if use_bs:
                 bs = calc.band_structure()
                 xcoords, label_xcoords, labels = bs.get_labels()
@@ -237,11 +247,13 @@ class MaterCalc(object):
                 kpts = dict(path=special_paths[lattice_type],
                             npoints=self.params["gap"][method]["npoints"])
             else:
-                kpts = dict(density=12)
+                kpts = None
+
             calc_bs = GPAW(restart=self.__gs_gllb_file)
-            calc_bs.set(kpts=kpts,
-                        fixdensity=True,
-                        symmetry="off")
+            if kpts is not None:
+                calc_bs.set(kpts=kpts,
+                            fixdensity=True,
+                            symmetry="off")
             calc_bs.get_potential_energy()
             homolumo = calc_bs.get_homo_lumo()
             response = calc_bs.hamiltonian.xc.xcs["RESPONSE"]
@@ -259,6 +271,10 @@ class MaterCalc(object):
             bg_gllb_dir, *_  = bg(eigenvalues=e_kn,
                                        efermi=efermi,
                                        direct=True)
+            if bg_gllb_min is None:
+                bg_gllb_min = 0
+            if bg_gllb_dir is None:
+                bg_gllb_dir = 0
             if use_bs:
                 bs = calc_bs.band_structure()
                 bs.energies[bs.energies > bs.reference] += Dxc  # Shift gllbsc discontinuous

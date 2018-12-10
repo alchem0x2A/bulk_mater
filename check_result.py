@@ -30,8 +30,9 @@ def main():
         mc = MaterCalc(atoms=None, base_dir=base_dir)
         if all([value for key, value in mc.check_status().items()]):
             finished += 1
-        print("{}-{}:".format(formula, prototype),
-              mc.check_status())
+        else:
+            print("{}-{}:".format(formula, prototype),
+                  mc.check_status())
     print("Finished jobs {}".format(finished))
     return True
     
