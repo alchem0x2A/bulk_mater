@@ -2,7 +2,7 @@ import os
 import numpy
 import json
 import ase.db
-from ase.constraints import StrainFilter
+from ase.constraints import StrainFilter, UnitCellFilter, ExpCellFilter
 from ase.parallel import world, rank, parprint
 from ase.optimize import BFGS
 from ase.atoms import Atoms
@@ -75,7 +75,8 @@ class MaterCalc(object):
               method="IT",
               fmax=0.01,        # maximum force or stress * Volume
               steps=500,
-              xc="pbe"):        # maximum steps
+              xc="pbe",
+              skip=False):        # maximum steps
         atoms_copy = self.atoms.copy()  # makesure nothing happens
         method = method.upper()
         # Continue without calculation
@@ -87,6 +88,10 @@ class MaterCalc(object):
         else:
             raise NotImplementedError("xc method not implemented")
             
+        if skip:                # Do not relax
+            atoms_copy.write(relaxed_traj)
+            return True
+        
         if os.path.exists(relaxed_traj):
             parprint("Relaxation Already Done!")
             return True
@@ -156,10 +161,11 @@ class MaterCalc(object):
         calc = GPAW(**self.params["gs"],
                     txt=os.path.join(self.base_dir,
                                      "gs.txt"))
+        
         traj.set_calculator(calc)
         try:
             traj.get_potential_energy()
-            calc.write(self.__gs_file)  # write
+            calc.write(self.__gs_file, mode="all")  # write
         except Exception as e:
             parprint("Something wrong with gs calculation!")
             parprint("ErrMsg: {}".format(e))
@@ -168,7 +174,7 @@ class MaterCalc(object):
             return True
             
 
-    def bandgap(self, method="GLLB", save=True):
+    def bandgap(self, method="GLLB", save=True, skip=False):
         # Check method input
         method = method.strip().lower()
         if method not in ("pbe", "gllb",
@@ -233,13 +239,15 @@ class MaterCalc(object):
             # Need to restart the SC calculation
             if not os.path.exists(self.__gs_gllb_file):
                 if not os.path.exists(self.__relaxed_gllb_traj):
-                    self.relax(fmax=0.002, steps=200, xc="gllb")
+                    self.relax(fmax=0.002, steps=200, xc="gllb", skip=skip)
+                world.barrier()
+                atoms = read(self.__relaxed_gllb_traj)
                 calc = GPAW(**self.params["gs"], txt=os.path.join(self.__base_dir,
                                                                   "gs_gllb.txt"))
-                calc.atoms = read(self.__relaxed_gllb_traj)
+                atoms.set_calculator(calc)
                 calc.set(xc="GLLBSC")
-                calc.get_potential_energy()  # Recalculate GS
-                calc.write(self.__gs_gllb_file)
+                atoms.get_potential_energy()  # Recalculate GS
+                calc.write(self.__gs_gllb_file, mode="all")
             #TODO: merge with PBE method
             calc_bs = GPAW(restart=self.__gs_gllb_file)
             try:
@@ -305,11 +313,14 @@ class MaterCalc(object):
             parprint("Excited state calculated!")
             return True
 
-        calc = GPAW(restart=self.__gs_file,
-                    **self.params["es"])
-        calc.get_potential_energy()
+        calc = GPAW(restart=self.__gs_file, parallel=dict(kpt=1))
         nv = calc.get_number_of_electrons() // 2
         nbands = max(70, nv * 3)  # include empty bands
+        parprint(self.params["es"])
+        calc.set(**self.params["es"])
+        calc.set(nbands=int(nbands))
+        calc.get_potential_energy()
+        
         # calc.set(**self.params["es"])  # only parallel over 1 kpt
         calc.diagonalize_full_hamiltonian(nbands=int(nbands))  # diagonalize
         calc.write(self.__es_file, mode="all")

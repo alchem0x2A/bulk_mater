@@ -15,9 +15,12 @@ class StructureBuilder(object):
     def __init__(self,
                  json_file=os.path.join(os.path.dirname(__file__),
                                         "../config/prototype.json"),
+                 abx3_db=os.path.join(os.path.dirname(__file__),
+                                        "../config/organometal.db"),
                  structure_path=os.path.join(os.path.dirname(__file__),
                                        "../config/crystal_structures/")):
         self.register_json(json_file, structure_path)
+        self.register_db(abx3_db)
         return
 
     def register_json(self, json_file, structure_path):
@@ -40,6 +43,13 @@ class StructureBuilder(object):
         self.__strucutre_lookup_path = structure_path
         return
 
+    def register_db(self, abx3_db):
+        if os.path.exists(abx3_db):
+            self.__abx3_db = ase.db.connect(abx3_db)
+            return
+        else:
+            raise FileNotFoundError("Please download the abx2 db!")
+        
     @property
     def entries(self):
         return self.__entries
@@ -50,21 +60,31 @@ class StructureBuilder(object):
     
     def get_structure(self, formula, prototype=None):
         """Return candidates of structure provided the information
+           If the material is a perovskite, using the db file!
         """
-        candidates = [entry for entry in self.__entries \
-                      if entry["formula"] == formula]
-        if len(candidates) == 0:
-            return candidates   # always empty!
-        else:
-            # All candidates must be returned if not specified
-            if prototype is None:
+        if prototype.lower() != "perovskite":  # The normal III-V prototype
+            candidates = [entry for entry in self.__entries \
+                          if entry["formula"] == formula]
+            if len(candidates) == 0:
+                return candidates   # always empty!
+            else:
+                # All candidates must be returned if not specified
+                if prototype is None:
+                    return candidates
+                # Original prototype can be single entry or multiple
+                # alway convert them into tuple            
+                prototypes = convert_name(prototype)
+                final_candidates = [c for c in candidates \
+                                    if c["prototype"] in prototypes]
+                return list(map(self._convert_struct, final_candidates))
+        else:                   # A Perovskite?
+            # Formula is {Cs, Fa, MA}-{Pb, Sn}-{Cl3, Br3, I3}
+            candidates = list(self.__abx3_db.select(name=formula,
+                                                    symmetry='cubic'))
+            if len(candidates) == 0:
                 return candidates
-            # Original prototype can be single entry or multiple
-            # alway convert them into tuple            
-            prototypes = convert_name(prototype)
-            final_candidates = [c for c in candidates \
-                                if c["prototype"] in prototypes]
-            return list(map(self._convert_struct, final_candidates))
+            else:
+                return [build_perovskite(c) for c in candidates]
 
     def from_index(self, index):
         if hasattr(index, "__iter__"):  # iterable?
@@ -119,6 +139,8 @@ def convert_name(cs):
                 return "cesiumchloride"
             elif _cs[0] == "d":
                 return "diamond"
+            elif _cs[0] == "p":
+                return "perovskite"
             else:
                 return "other"
         else:
@@ -131,14 +153,26 @@ def convert_name(cs):
         
 # Construct the bulk material using given crystalline geometry
 
+# Build perovskite struct from the db entry
+def build_perovskite(entry):
+    atoms = Atoms(numbers=entry.numbers,
+                  positions=entry.positions,
+                  cell=entry.cell,
+                  pbc=[True, True, True])
+    return atoms
 
     
 
 if __name__ == "__main__":
     import os, sys
+    from ase.visualize import view
     if len(sys.argv) < 3:
         raise ValueError("not enough parameters")
     else:
         formula = sys.argv[1]
         cs = sys.argv[2]
-        print(get_structure(formula, cs))
+        sb = StructureBuilder()
+        res = sb.get_structure(formula, cs)
+        if len(res) > 0:
+            print(len(res))
+            [view(i) for i in res]

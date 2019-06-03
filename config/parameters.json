@@ -19,7 +19,7 @@
     "xc": "PBE",
     "kpts": {
       "gamma": true,
-      "density": 10
+      "density": 5.0
     },
     "basis": "dzp",
     "mode": {
@@ -45,13 +45,10 @@
     "fixdensity": true,
     "kpts": {
       "gamma": false,
-      "density": 10
+      "density": 8
     },
     "convergence": {
       "bands": -5
-    },
-    "parallel": {
-      "kpt": 1
     }
   },
   "rpa": {

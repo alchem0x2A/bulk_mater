@@ -27,12 +27,25 @@ def run_single(formula, prototype,
     sb = StructureBuilder()
     atoms, *_ = sb.get_structure(formula, prototype)
     m_calc = MaterCalc(atoms=atoms, base_dir=base_dir)
-    m_calc.relax(fmax=0.002)
+    if prototype != "perovskite":
+        m_calc.relax(fmax=0.002)
+    else:
+        # m_calc.relax(fmax=0.02, method="UCF")
+        m_calc.relax(skip=True)
     m_calc.ground_state()
-    eg_min, eg_dir, *_ = m_calc.bandgap(method="pbe")
-    parprint("PBE min/dir: {:.3f}\t{:.3f}".format(eg_min, eg_dir))
-    eg_min, eg_dir, *_ = m_calc.bandgap(method="gllb")
-    parprint("GLLB min/dir: {:.3f}\t{:.3f}".format(eg_min, eg_dir))
+    if prototype != "perovskite":
+        eg_min, eg_dir, *_ = m_calc.bandgap(method="pbe")
+        parprint("PBE min/dir: {:.3f}\t{:.3f}".format(eg_min, eg_dir))
+        eg_min, eg_dir, *_ = m_calc.bandgap(method="gllb")
+        parprint("GLLB min/dir: {:.3f}\t{:.3f}".format(eg_min, eg_dir))
+    else:
+        pass
+        # eg_min, eg_dir, *_ = m_calc.bandgap(method="pbe", skip=True)
+        # parprint("PBE min/dir: {:.3f}\t{:.3f}".format(eg_min, eg_dir))
+        # eg_min, eg_dir, *_ = m_calc.bandgap(method="gllb", skip=True)
+        # parprint("GLLB min/dir: {:.3f}\t{:.3f}".format(eg_min, eg_dir))
+        # Use db values
+        
     m_calc.excited_state()
     m_calc.dielectric(method="rpa")
 
